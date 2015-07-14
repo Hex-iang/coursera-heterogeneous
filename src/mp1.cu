@@ -3,6 +3,9 @@
 
 __global__ void vecAdd(float *in1, float *in2, float *out, int len) {
   //@@ Insert code to implement vector addition here
+  int idx = threadIdx.x + blockIdx.x*blockDim.x;
+  if (idx < len) 
+    out[idx] = in1[idx] + in2[idx];
 }
 
 int main(int argc, char **argv) {
@@ -27,29 +30,43 @@ int main(int argc, char **argv) {
 
   wbTime_start(GPU, "Allocating GPU memory.");
   //@@ Allocate GPU memory here
+  cudaMalloc( (void **)&deviceInput1, inputLength * sizeof(float) );
+  cudaMalloc( (void **)&deviceInput2, inputLength * sizeof(float) );
+  cudaMalloc( (void **)&deviceOutput, inputLength * sizeof(float) );
 
   wbTime_stop(GPU, "Allocating GPU memory.");
 
   wbTime_start(GPU, "Copying input memory to the GPU.");
   //@@ Copy memory to the GPU here
+  cudaMemcpy(deviceInput1, hostInput1, inputLength * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(deviceInput2, hostInput2, inputLength * sizeof(float), cudaMemcpyHostToDevice);
 
   wbTime_stop(GPU, "Copying input memory to the GPU.");
-
   //@@ Initialize the grid and block dimensions here
+  cudaMemset(deviceOutput, 0, inputLength * sizeof(float) );
 
   wbTime_start(Compute, "Performing CUDA computation");
   //@@ Launch the GPU Kernel here
+  // Allocate 16 threads for this vector addition task
+  int THREAD_NUM = 64;
+  dim3 dimGrid( (inputLength - 1) / THREAD_NUM + 1, 1, 1);
+  dim3 dimBlock( THREAD_NUM, 1, 1);
+  vecAdd<<<dimGrid, dimBlock>>>(deviceInput1, deviceInput2, deviceOutput, inputLength);
 
   cudaDeviceSynchronize();
   wbTime_stop(Compute, "Performing CUDA computation");
 
   wbTime_start(Copy, "Copying output memory to the CPU");
   //@@ Copy the GPU memory back to the CPU here
+  cudaMemcpy(hostOutput, deviceOutput, inputLength * sizeof(float), cudaMemcpyDeviceToHost);
 
   wbTime_stop(Copy, "Copying output memory to the CPU");
 
   wbTime_start(GPU, "Freeing GPU Memory");
   //@@ Free the GPU memory here
+  cudaFree(&deviceInput1);
+  cudaFree(&deviceInput2);
+  cudaFree(&deviceOutput);
 
   wbTime_stop(GPU, "Freeing GPU Memory");
 

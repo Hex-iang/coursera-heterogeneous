@@ -15,9 +15,11 @@ int main(int argc, char ** argv) {
 
     for (int dev = 0; dev < deviceCount; dev++) {
         cudaDeviceProp deviceProp;
-
+        
+        // Get property
         cudaGetDeviceProperties(&deviceProp, dev);
 
+        // For the first devise, output information about what is happening
         if (dev == 0) {
             if (deviceProp.major == 9999 && deviceProp.minor == 9999) {
                 wbLog(TRACE, "No CUDA GPU has been detected");
@@ -33,6 +35,7 @@ int main(int argc, char ** argv) {
             }
         }
 
+        // output corresponding information about devise
         wbLog(TRACE, "Device ", dev, " name: ", deviceProp.name);
         wbLog(TRACE, " Computational Capabilities: ", deviceProp.major, ".", deviceProp.minor);
         wbLog(TRACE, " Maximum global memory size: ", deviceProp.totalGlobalMem);
