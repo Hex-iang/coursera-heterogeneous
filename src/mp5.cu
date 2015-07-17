@@ -15,11 +15,66 @@
         }                                                                     \
     } while(0)
 
+#ifdef SUBFUNC
+ __device__ void reduction(float * cache){
+  int tx = threadIdx.x; 
+
+  for (int stride = 1; stride < BLOCK_SIZE + 1; stride *= 2){
+    __syncthreads();
+    int idx = (tx + 1)*stride*2 - 1;
+    if( idx < 2 * BLOCK_SIZE)
+      cache[idx] += cache[idx - stride];
+  }
+}
+
+__device__ void post_reduction(float * cache ){
+  int tx = threadIdx.x;
+
+  for (int stride = BLOCK_SIZE / 2; stride > 0; stride /= 2){
+    __syncthreads();
+    int idx = (tx + 1)*stride*2 - 1;
+    if( idx + stride < 2*BLOCK_SIZE)
+      cache[idx + stride] += cache[idx];
+  }
+}
+#endif
+
 __global__ void scan(float * input, float * output, int len) {
-    //@@ Modify the body of this function to complete the functionality of
-    //@@ the scan on the device
-    //@@ You may need multiple kernel calls; write your kernels before this
-    //@@ function and call them from here
+  //@@ Modify the body of this function to complete the functionality of
+  //@@ the scan on the device
+  //@@ You may need multiple kernel calls; write your kernels before this
+  //@@ function and call them from here
+  int tx = threadIdx.x; 
+  int bx = blockIdx.x;
+  int start = bx * blockDim.x * 2;
+
+  __shared__ float cache[2 * BLOCK_SIZE];
+
+  // load data
+  cache[tx] = ((start + tx) < len )? input[start + tx]: 0.0f;
+  if( start + tx + BLOCK_SIZE < len )
+    cache[ BLOCK_SIZE + tx ] = input[ BLOCK_SIZE + start + tx];
+  else
+    cache[ BLOCK_SIZE + tx ] = 0.0f;
+
+  for (int stride = 1; stride < BLOCK_SIZE + 1; stride *= 2){
+    __syncthreads();
+    int idx = (tx + 1)*stride*2 - 1;
+    if( idx < 2 * BLOCK_SIZE)
+      cache[idx] += cache[idx - stride];
+  }
+
+  for (int stride = BLOCK_SIZE / 2; stride > 0; stride /= 2){
+    __syncthreads();
+    int idx = (tx + 1)*stride*2 - 1;
+    if( idx + stride < 2 * BLOCK_SIZE)
+      cache[idx + stride] += cache[idx];
+  }
+
+  __syncthreads();
+
+  if ( start + tx < len )
+    output[start + tx] = cache[tx];
 }
 
 int main(int argc, char ** argv) {
@@ -50,13 +105,18 @@ int main(int argc, char ** argv) {
 
     wbTime_start(GPU, "Copying input memory to the GPU.");
     wbCheck(cudaMemcpy(deviceInput, hostInput, numElements*sizeof(float), cudaMemcpyHostToDevice));
-    wbTime_stop(GPU, "Copying input memory to the GPU.");
-
+    wbTime_stop(GPU, "Copying input memory to the GPU."); 
     //@@ Initialize the grid and block dimensions here
+    dim3 dimGrid( (numElements - 1) / BLOCK_SIZE + 1, 1, 1);
+    dim3 dimBlock ( BLOCK_SIZE, 1, 1);
+    
+    wbLog(TRACE, "Grid dimension: ", dimGrid.x, "x", dimGrid.y, "x", dimGrid.z);
+    wbLog(TRACE, "Block dimension: ", dimBlock.x, "x", dimBlock.y, "x", dimBlock.z);
 
     wbTime_start(Compute, "Performing CUDA computation");
     //@@ Modify this to complete the functionality of the scan
     //@@ on the deivce
+    scan<<<dimGrid, dimBlock>>>( deviceInput, deviceOutput, numElements );
 
     cudaDeviceSynchronize();
     wbTime_stop(Compute, "Performing CUDA computation");
