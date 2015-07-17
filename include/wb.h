@@ -578,7 +578,6 @@ float* wbImport(const char* fName, int* numRows, int* numCols)
 
     return fBuf;
 }
-
 struct wbImage_t
 {
     int width;
@@ -962,6 +961,57 @@ namespace wbInternal
     }
 } // namespace wbInternal
 
+//==========================================================================================
+// Output necessary file information for debug...
+template < typename T, typename S >
+void wbDumpTestCase(const char* fName, S& numElements, const T& fCurrent, const T& fSolution)
+{
+    std::cout << "Dumping Test Case as: " << fName << std::endl;
+    std::ofstream outFile(fName);
+
+    if (!outFile.is_open())
+    {
+        std::cerr << "Error opening output file " << fName << ". " << wbInternal::wbStrerror(errno) << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+
+    outFile << "Idx, Current, Solution" << std::endl; 
+    for (int i = 0; i < numElements; i++)
+    {
+        outFile << i  << "," << fCurrent[i] << "," << fSolution[i] << std::endl;
+    }
+
+    outFile.close();
+
+}
+//==========================================================================================
+// Output necessary file information for debug...
+template < typename T, typename S , typename U>
+void wbDumpTestCase(const char* fName, S& numRows, U& numCols, const T& fCurrent, const T& fSolution)
+{
+    std::cout << "Dumping Test Case as: " << fName << std::endl;
+    std::ofstream outFile(fName);
+
+    if (!outFile.is_open())
+    {
+        std::cerr << "Error opening output file " << fName << ". " << wbInternal::wbStrerror(errno) << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+
+    outFile << "Idx, Current, Solution" << std::endl; 
+    for (int i = 0; i < numRows; i++)
+    {
+        for (int j = 0; j < numCols ; ++j)
+        {
+            outFile << "[" << i << "][" << j << "]" << "=" 
+                    << fCurrent[i*numCols+j] << "," << fSolution[i*numCols+j] 
+                    << std::endl;
+        }
+    }
+
+    outFile.close();
+
+}
 // For assignments MP1, MP4, MP5 & MP12
 template < typename T, typename S >
 void wbSolution(const wbArg_t args, const T& t, const S& s)
@@ -994,8 +1044,11 @@ void wbSolution(const wbArg_t args, const T& t, const S& s)
 
         if (!errCnt)
             std::cout << "Solution is correct.\n";
-        else
+        else{
             std::cout << errCnt << " tests failed!\n";
+            std::string dumpTestCase = wbArg_getInputFile(args, args.argc - 2) + std::string(".dump");
+            wbDumpTestCase( dumpTestCase.c_str(), s, t, soln );
+        }
     }
 
     free(soln);
@@ -1039,8 +1092,11 @@ void wbSolution(const wbArg_t& args, const T& t, const S& s, const U& u)
 
         if (!errCnt)
             std::cout << "Solution is correct.\n";
-        else
+        else{
             std::cout << errCnt << " tests failed!\n";
+            std::string dumpTestCase = wbArg_getInputFile(args, args.argc - 2) + std::string(".dump");
+            wbDumpTestCase( dumpTestCase.c_str(), s, u, t, soln );
+        }
     }
 
     free(soln);
