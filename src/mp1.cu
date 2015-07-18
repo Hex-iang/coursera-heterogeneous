@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
   wbTime_start(Compute, "Performing CUDA computation");
   //@@ Launch the GPU Kernel here
   // Allocate 16 threads for this vector addition task
-  int THREAD_NUM = 64;
+  int THREAD_NUM = 16;
   dim3 dimGrid( (inputLength - 1) / THREAD_NUM + 1, 1, 1);
   dim3 dimBlock( THREAD_NUM, 1, 1);
   vecAdd<<<dimGrid, dimBlock>>>(deviceInput1, deviceInput2, deviceOutput, inputLength);

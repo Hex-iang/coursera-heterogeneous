@@ -59,23 +59,23 @@ __global__ void post_process(float * output, int len) {
 
   for (int offset = start; offset < len; offset += BLOCK_SIZE*2)
   {
-    int last_checkpoint = offset - 1;
+    int previous_block_entry = offset - 1;
 
 #ifdef DEBUG
 
     if ( tx == 1){
-      printf("threadIdx: %d, blockIdx: %d, last_checkpoint: %d\n", tx, bx, last_checkpoint );
+      printf("threadIdx: %d, blockIdx: %d, previous_block_entry: %d\n", tx, bx, previous_block_entry );
     } 
 
 #undef DEBUG
 #endif
 
-    if ( last_checkpoint >= 0 ){
+    if ( previous_block_entry >= 0 ){
       // last checkpoint index
       if ( offset + tx < len )  
-        output[offset + tx] += output[last_checkpoint];
+        output[offset + tx] += output[previous_block_entry];
       if ( offset + tx + BLOCK_SIZE < len ) 
-        output[offset + tx + BLOCK_SIZE] += output[last_checkpoint];
+        output[offset + tx + BLOCK_SIZE] += output[previous_block_entry];
     }
 
     __syncthreads();
