@@ -4,6 +4,9 @@ GenDataMP*
 mat*.txt
 vec*.txt
 
+## Ignore images 
+*.ppm
+
 ## Emacs.gitignore
 *~
 \#*\#

@@ -1169,8 +1169,12 @@ void wbSolution(const wbArg_t& args, const wbImage_t& image)
 
         if (!errCnt)
             std::cout << "Solution is correct." << std::endl;
-        else
+        else{
             std::cout << errCnt << " tests failed!" << std::endl;
+            std::string dumpTestCase = wbArg_getInputFile(args, args.argc - 2) + std::string(".dump.ppm");
+            std::cout << "Dumping Test Case as: " << dumpTestCase << std::endl;
+            wbInternal::wbImage_save(image, args, dumpTestCase.c_str());
+        }
     }
 
     wbImage_delete(solnImage);

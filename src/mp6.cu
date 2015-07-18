@@ -17,49 +17,50 @@
 #define BLOCK_WIDTH  (TILE_WIDTH + Mask_width - 1)
 
 #define CLAMP(x) ( (x < 0.0f)? 0.0f: ( (x > 1.0f)? 1.0f: x ) )
+#define CHANNEL_SIZE 3
 
 //@@ INSERT CODE HERE
 __global__ void convolution2D( float * input, const float * __restrict__  mask , float * output, 
                      int imageHeight,  int imageWidth,  int imageChannels)
 {
   //@@ concrete code for 2D image convolution on GPU
-  int tx = threadIdx.x; int ty = threadIdx.y;
-  int row_out = ty + blockIdx.y * TILE_WIDTH;
-  int col_out = tx + blockIdx.x * TILE_WIDTH;
+  int tx = threadIdx.x; int ty = threadIdx.y; 
+  int bx = blockIdx.x;  int by = blockIdx.y;  int bz = blockIdx.z;
 
-  int row_in = row_out - Mask_radius;
-  int col_in = col_out - Mask_radius;
+  int row_out = ty + by * TILE_WIDTH;
+  int col_out = tx + bx * TILE_WIDTH;
+  int unroll_out = (row_out * imageWidth + col_out) * imageChannels + bz;
+  
+  int row_in = ty + by * TILE_WIDTH - Mask_radius;
+  int col_in = tx + bx * TILE_WIDTH - Mask_radius;
+  int unroll_in = (row_in * imageWidth + col_in) * imageChannels + bz;
+ 
+  __shared__ float cache[CHANNEL_SIZE][BLOCK_WIDTH][BLOCK_WIDTH];
 
-  __shared__ float cache[BLOCK_WIDTH][BLOCK_WIDTH];
+  //@@ Major workflow on image data loading
+  if( (row_in >= 0 && row_in < imageHeight ) &&
+      (col_in >= 0 && col_in < imageWidth  ) ){
+    cache[bz][ty][tx] = input[ unroll_in ];
+  }else{
+    cache[bz][ty][tx] = 0.0f;
+  }
 
-  for( int c = 0; c < imageChannels; c++)
+  __syncthreads();
+
+  //@@ Handle boundary condition of image data loading
+  float out_val = 0.0f;
+  if( tx < TILE_WIDTH && ty < TILE_WIDTH && row_out < imageHeight && col_out < imageWidth )
   {
-    //@@ Major workflow on image data loading
-    if( (row_in >= 0 && row_in < imageHeight ) &&
-        (col_in >= 0 && col_in < imageWidth  ) ){
-      cache[ty][tx] = input[ (row_in * imageWidth + col_in) * imageChannels + c ];
-    }else{
-      cache[ty][tx] = 0.0f;
-    }
-
-    //@@ Need some code for boundary condition of image data loading
-
-    __syncthreads();
-
-    float out_val = 0.0f;
-    if( tx < TILE_WIDTH && ty < TILE_WIDTH )
-    {
-      for( int y = 0; y < Mask_width; y++){
-        for( int x = 0; x < Mask_width; x++){
-          out_val += cache[ty + y][tx + x] * mask[y*Mask_width + x];
-        }
+    // #pragma unroll
+    for( int y = 0; y < Mask_width; y++){
+      // #pragma unroll
+      for( int x = 0; x < Mask_width; x++){
+        out_val += cache[bz][ty + y][tx + x] * mask[y*Mask_width + x];
       }
     }
-  
-    if( row_out < imageHeight && col_out < imageWidth )
-      output[ (row_out * imageWidth + col_out) * imageChannels + c ] = CLAMP(out_val);
 
     __syncthreads();
+    output[ unroll_out ] = CLAMP(out_val);
   }
 }
 
@@ -125,7 +126,7 @@ int main(int argc, char* argv[]) {
 
     wbTime_start(Compute, "Doing the computation on the GPU");
     //@@ INSERT CODE HERE
-    dim3 dimGrid( (imageWidth - 1 ) / TILE_WIDTH + 1, (imageHeight - 1) / TILE_WIDTH + 1, 1 );
+    dim3 dimGrid( (imageWidth - 1 ) / TILE_WIDTH + 1, (imageHeight - 1) / TILE_WIDTH + 1, imageChannels );
     dim3 dimBlock( BLOCK_WIDTH, BLOCK_WIDTH, 1);
     convolution2D<<<dimGrid, dimBlock>>>( deviceInputImageData, deviceMaskData, deviceOutputImageData, 
                                          imageHeight, imageWidth, imageChannels);
